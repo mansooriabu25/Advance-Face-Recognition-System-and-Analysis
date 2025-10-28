@@ -9,11 +9,13 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 from PIL import Image
-
 import streamlit as st
 import torch
 from facenet_pytorch import MTCNN, InceptionResnetV1
 import plotly.express as px
+from LineChart import LineChart
+from BarChart import BarChart
+from PieChart import PieChart
 
 # --------------------------
 # Configuration
@@ -27,7 +29,7 @@ SIMILARITY_THRESHOLD = 0.75
 TRACKER_MAX_DISAPPEAR = 10
 EMBEDDINGS_PATH = 'embeddings.pkl'
 ATTENDANCE_CSV = 'attendance.csv'
-VISUALS_LOG_PATH = 'visuals_log.csv'  # New file for visual tracking
+VISUALS_LOG_PATH = 'visuals_log.csv'  
 OUTPUT_WINDOW_NAME = "Face Attendance (OpenCV) - press 'q' or Stop in UI"
 
 # Visual
@@ -665,14 +667,18 @@ with tabs[2]:
             save_db(db)
             st.success(f"✅ Updated {edit_pid} — Name: {new_name}, Age: {new_age}, Gender: {new_gender}")
 
-            # --- Sync with attendance.csv ---
-            attendance_path = ATTENDANCE_CSV
-            if os.path.exists(attendance_path):
+            # --- Sync with visuals_log.csv ---
+            visuals_path = VISUALS_LOG_PATH
+            if os.path.exists(visuals_path):
                 try:
-                    att_df = pd.read_csv(attendance_path)
+                    att_df = pd.read_csv(visuals_path)
                     # Create name column if not exists
                     if "name" not in att_df.columns:
                         att_df["name"] = ""
+                    if "age" not in att_df.columns:
+                        att_df["age"] = ""
+                    if "gender" not in att_df.columns:
+                        att_df["gender"] = ""
                     # Identify correct ID column
                     id_col = None
                     for col in att_df.columns:
@@ -682,14 +688,28 @@ with tabs[2]:
                     if id_col:
                         # Update name wherever person_id matches
                         att_df.loc[att_df[id_col] == edit_pid, "name"] = new_name
-                        att_df.to_csv(attendance_path, index=False)
-                        st.info(f"🗂️ Synced name to {attendance_path} for {edit_pid}")
+                        att_df.to_csv(visuals_path, index=False)
+                        st.info(f"🗂️ Synced name to {visuals_path} for {edit_pid}")
+                    else:
+                        st.warning("⚠️ Could not find person_id column in attendance.csv")
+                    if id_col:
+                        # Update age wherever person_id matches
+                        att_df.loc[att_df[id_col] == edit_pid, "age"] = new_age
+                        att_df.to_csv(visuals_path, index=False)
+                        st.info(f"🗂️ Synced name to {visuals_path} for {edit_pid}")
+                    else:
+                        st.warning("⚠️ Could not find person_id column in attendance.csv")
+                    if id_col:
+                        # Update gender wherever person_id matches
+                        att_df.loc[att_df[id_col] == edit_pid, "gender"] = new_gender
+                        att_df.to_csv(visuals_path, index=False)
+                        st.info(f"🗂️ Synced name to {visuals_path} for {edit_pid}")
                     else:
                         st.warning("⚠️ Could not find person_id column in attendance.csv")
                 except Exception as e:
                     st.warning(f"⚠️ Error syncing attendance file: {e}")
             else:
-                st.warning("⚠️ attendance.csv not found, skipping sync")
+                st.warning("⚠️ visiual_logs.csv not found, skipping sync")
 
         st.markdown("---")
         st.subheader("🗑️ Delete Person")
@@ -702,111 +722,219 @@ with tabs[2]:
 
 with tabs[3]:
     st.header("📊 Visuals - Visitor Time Pattern")
+    LineChart()
+    BarChart()
+    PieChart()
+    
+    # visuals_path = VISUALS_LOG_PATH
 
-    visuals_path = VISUALS_LOG_PATH
+    # if os.path.exists(visuals_path):
+    #     try:
+    #         df = pd.read_csv(visuals_path)
+    #         if "timestamp" in df.columns:
+    #             df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+    #         else:
+    #             df["timestamp"] = pd.NaT
+    #     except Exception:
+    #         df = pd.DataFrame(columns=["identifier", "timestamp", "datetime"])
 
-    if os.path.exists(visuals_path):
-        try:
-            df = pd.read_csv(visuals_path)
-            if "timestamp" in df.columns:
-                df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
-            else:
-                df["timestamp"] = pd.NaT
-        except Exception:
-            df = pd.DataFrame(columns=["identifier", "timestamp", "datetime"])
+    #     # --- Filter options ---
+    #     filter_option = st.selectbox(
+    #         "Select time range:",
+    #         ["All time", "Today", "Last 30 minutes", "Last 1 hour", "Last 3 hours"],
+    #     )
 
-        # --- Filter options ---
-        filter_option = st.selectbox(
-            "Select time range:",
-            ["All time", "Today", "Last 30 minutes", "Last 1 hour", "Last 3 hours"],
-        )
+    #     now = datetime.now()
+    #     if not df.empty and df["timestamp"].notna().any():
+    #         if filter_option == "Today":
+    #             df = df[df["timestamp"].dt.date == now.date()]
+    #         elif filter_option == "Last 30 minutes":
+    #             df = df[df["timestamp"] >= now - pd.Timedelta(minutes=30)]
+    #         elif filter_option == "Last 1 hour":
+    #             df = df[df["timestamp"] >= now - pd.Timedelta(hours=1)]
+    #         elif filter_option == "Last 3 hours":
+    #             df = df[df["timestamp"] >= now - pd.Timedelta(hours=3)]
 
-        now = datetime.now()
-        if not df.empty and df["timestamp"].notna().any():
-            if filter_option == "Today":
-                df = df[df["timestamp"].dt.date == now.date()]
-            elif filter_option == "Last 30 minutes":
-                df = df[df["timestamp"] >= now - pd.Timedelta(minutes=30)]
-            elif filter_option == "Last 1 hour":
-                df = df[df["timestamp"] >= now - pd.Timedelta(hours=1)]
-            elif filter_option == "Last 3 hours":
-                df = df[df["timestamp"] >= now - pd.Timedelta(hours=3)]
+    #     if not df.empty and df["timestamp"].notna().any():
+    #         # --- Filter between 9 AM and 11 PM ---
+    #         df = df[(df["timestamp"].dt.hour >= 9) & (df["timestamp"].dt.hour <= 23)]
 
-        if not df.empty and df["timestamp"].notna().any():
-            # --- Filter between 9 AM and 11 PM ---
-            df = df[(df["timestamp"].dt.hour >= 9) & (df["timestamp"].dt.hour <= 23)]
+    #         if not df.empty:
+    #             # --- Create hourly bins ---
+    #             df["hour_bin"] = df["timestamp"].dt.floor("h")
 
-            if not df.empty:
-                # --- Create hourly bins ---
-                df["hour_bin"] = df["timestamp"].dt.floor("h")
+    #             hour_range = pd.date_range(
+    #                 df["hour_bin"].min().replace(hour=9, minute=0, second=0),
+    #                 df["hour_bin"].max().replace(hour=23, minute=0, second=0),
+    #                 freq="h",
+    #             )
 
-                hour_range = pd.date_range(
-                    df["hour_bin"].min().replace(hour=9, minute=0, second=0),
-                    df["hour_bin"].max().replace(hour=23, minute=0, second=0),
-                    freq="h",
-                )
+    #             grouped = (
+    #                 df.groupby("hour_bin")
+    #                 .agg({
+    #                     "identifier": lambda x: ", ".join(map(str, x)),
+    #                     "timestamp": lambda x: ", ".join(x.dt.strftime("%H:%M:%S").tolist()),
+    #                     "datetime": "count",
+    #                 })
+    #                 .reset_index()
+    #                 .rename(columns={"datetime": "Count"})
+    #             )
 
-                grouped = (
-                    df.groupby("hour_bin")
-                    .agg({
-                        "identifier": lambda x: ", ".join(map(str, x)),
-                        "timestamp": lambda x: ", ".join(x.dt.strftime("%H:%M:%S").tolist()),
-                        "datetime": "count",
-                    })
-                    .reset_index()
-                    .rename(columns={"datetime": "Count"})
-                )
+    #             grouped = pd.merge(
+    #                 pd.DataFrame({"hour_bin": hour_range}),
+    #                 grouped,
+    #                 on="hour_bin",
+    #                 how="left"
+    #             ).fillna({
+    #                 "Count": 0,
+    #                 "identifier": "",
+    #                 "timestamp": ""
+    #             })
 
-                grouped = pd.merge(
-                    pd.DataFrame({"hour_bin": hour_range}),
-                    grouped,
-                    on="hour_bin",
-                    how="left"
-                ).fillna({
-                    "Count": 0,
-                    "identifier": "",
-                    "timestamp": ""
-                })
+    #             grouped["time_range"] = grouped["hour_bin"].dt.strftime("%H:%M")
+                
+    #             # --- Create interactive line chart (Plotly Express) ---
+    #             fig = px.line(
+    #                 grouped,
+    #                 x="time_range",
+    #                 y="Count",
+    #                 markers=True,
+    #                 title="🕒 Visitors per Hour (9 AM - 11 PM)",
+    #                 hover_data={
+    #                     "identifier": True,
+    #                     "timestamp": True,   
+    #                     "Count": True,
+    #                     "time_range": False  
+    #                 },
+    #             )
+    #             fig.update_traces(line=dict(width=3,color="#FC3407"),marker=dict(size=8,color="white"))
+    #             st.plotly_chart(fig, use_container_width=True)
+    #             # --- Chart Styling ---
+    #             fig.update_layout(
+    #                 xaxis_title="Time Range (Hour)",
+    #                 yaxis_title="Number of Visitors",
+    #                 plot_bgcolor="black",
+    #                 hoverlabel=dict(bgcolor="white", font_color="black"),
+    #                 xaxis=dict(showgrid=True, gridcolor="gray"),
+    #                 yaxis=dict(showgrid=True, gridcolor="gray", dtick=1),
+    #                 margin=dict(l=70, r=40, t=80, b=50),
+    #             )
+    #             # --- Hourly Gender Distribution Chart ---
+    #             if "timestamp" in df.columns and "gender" in df.columns:
+    #                 df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+    #                 df = df[df["timestamp"].notna()]
 
-                grouped["time_range"] = grouped["hour_bin"].dt.strftime("%H:%M")
+    #                 # Create hour bins (hourly grouping)
+    #                 df["hour_bin"] = df["timestamp"].dt.floor("h")
+    #                 df["hour_label"] = df["hour_bin"].dt.strftime("%H:%M")
 
-                # --- Create interactive line chart (Plotly Express) ---
-                fig = px.line(
-                    grouped,
-                    x="time_range",
-                    y="Count",
-                    markers=True,
-                    title="🕒 Visitors per Hour (9 AM - 11 PM)",
-                    hover_data={
-                        "identifier": True,
-                        "timestamp": True,   
-                        "Count": True,
-                        "time_range": False  
-                    },
-                )
-                fig.update_traces(line=dict(width=3,color="#FC3407"),marker=dict(size=8,color="white"))
+    #                 # Count visitors per gender per hour
+    #                 hourly_gender_counts = (
+    #                     df.groupby(["hour_label", "gender"])
+    #                     .size()
+    #                     .reset_index(name="Count")
+    #                 )
 
-                # --- Chart Styling ---
-                fig.update_layout(
-                    xaxis_title="Time Range (Hour)",
-                    yaxis_title="Number of Visitors",
-                    plot_bgcolor="black",
-                    hoverlabel=dict(bgcolor="white", font_color="black"),
-                    xaxis=dict(showgrid=True, gridcolor="gray"),
-                    yaxis=dict(showgrid=True, gridcolor="gray", dtick=1),
-                    margin=dict(l=70, r=40, t=80, b=50),
-                )
+    #                 # Prepare hover info — exact times of appearances
+    #                 hover_data = (
+    #                     df.groupby(["hour_label", "gender"])["timestamp"]
+    #                     .apply(lambda x: ", ".join(x.dt.strftime("%H:%M:%S").tolist()))
+    #                     .reset_index()
+    #                     .rename(columns={"timestamp": "Exact_Times"})
+    #                 )
 
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.info("No visuals during the selected hours.")
-        else:
-            st.info("No visual logs for the selected period or timestamps could not be parsed.")
-    else:
-        st.info("No visual logs available yet.")
+    #                 # Merge hover info with counts
+    #                 hourly_gender_counts = pd.merge(
+    #                     hourly_gender_counts, hover_data, on=["hour_label", "gender"], how="left"
+    #                 )
+
+    #                 # Create grouped bar chart
+    #                 fig_hourly_gender = px.bar(
+    #                     hourly_gender_counts,
+    #                     x="hour_label",
+    #                     y="Count",
+    #                     color="gender",
+    #                     barmode="group", 
+    #                     title="🕒 Hourly Gender Distribution",
+    #                     hover_data=["Exact_Times"],
+    #                     color_discrete_map={
+    #                         "Male": "#71B4F8",
+    #                         "Female": "#F897C8",
+    #                         "Other": "#AAAAAA"
+    #                     }
+    #                 )
+
+    #                 # Style chart
+    #                 # fig_hourly_gender.update_traces(
+    #                 #     text=hourly_gender_counts["Count"],
+    #                 #     textposition="outside"
+    #                 # )
+    #                 fig_hourly_gender.update_layout(
+    #                     xaxis_title="Hour of the Day",
+    #                     yaxis_title="Number of Visitors",
+    #                     plot_bgcolor="black",
+    #                     hoverlabel=dict(bgcolor="white", font_color="black"),
+    #                     margin=dict(l=60, r=40, t=60, b=50),
+    #                 )
+
+    #                 st.plotly_chart(fig_hourly_gender, use_container_width=True)
+    #             else:
+    #                 st.info("Timestamp or gender column not found to plot hourly gender distribution.")
+
+    #             # --- Age Group Pie Chart ---
+    #             if "age" in df.columns:
+    #                 # Ensure numeric ages (in case some entries are missing or text)
+    #                 df["age"] = pd.to_numeric(df["age"], errors="coerce")
+    #                 df = df[df["age"].notna()]
+
+    #                 # Define age bins and labels
+    #                 bins = [10, 20, 30, 40, 50, 60, 100]
+    #                 labels = ["10–20 y/o", "20–30 y/o", "30–40 y/o", "40–50 y/o", "50–60 y/o", "60+ y/o"]
+
+    #                 # Categorize into age groups
+    #                 df["age_group"] = pd.cut(df["age"], bins=bins, labels=labels, right=False)
+
+    #                 # Count occurrences
+    #                 age_group_counts = (
+    #                     df["age_group"].value_counts()
+    #                     .reset_index()
+    #                     .rename(columns={"index": "Age Group", "age_group": "Count"})
+    #                 )
+    #                 age_group_counts.columns = ["Age Group", "Count"]
+
+    #                 # Create pie chart
+    #                 fig_age_pie = px.pie(
+    #                     age_group_counts,
+    #                     names="Age Group",  
+    #                     values="Count",
+    #                     title="🎂 Age Group Distribution of Appeared Persons",
+    #                     color_discrete_sequence=px.colors.qualitative.Pastel
+    #                 )
+
+    #                 # Style chart
+    #                 fig_age_pie.update_traces(
+    #                     textinfo="percent+label",
+    #                     hovertemplate="<b>%{label}</b><br>Count: %{value}<br>Percent: %{percent}",
+    #                     pull=[0.02] * len(age_group_counts)
+    #                 )
+    #                 fig_age_pie.update_layout(
+    #                     showlegend=True,
+    #                     legend_title="Age Group",
+    #                     margin=dict(l=40, r=40, t=60, b=60)
+    #                 )
+
+    #                 st.plotly_chart(fig_age_pie, use_container_width=True)
+    #             else:
+    #                 st.info("Age column not found to plot age group distribution.")
+
+    #         else:
+    #             st.info("No visuals during the selected hours.")
+    #     else:
+    #         st.info("No visual logs for the selected period or timestamps could not be parsed.")
+    # else:
+    #     st.info("No visual logs available yet.")
 
     # --- Clear logs ---
-    st.markdown("---")
     if st.button("🗑️ Clear Visual Logs"):
         try:
             with open(visuals_path, "w") as f:
@@ -817,3 +945,4 @@ with tabs[3]:
 
 st.markdown("---")
 st.caption("Pipeline: MTCNN (detection) → FaceNet/InceptionResnetV1 (512-d embeddings) → centroid tracking → 1-minute save → daily attendance log.")
+
